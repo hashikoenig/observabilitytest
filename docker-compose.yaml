@@ -44,8 +44,6 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
       - CERT_DIR=/certs
-      - DASH0_ENDPOINT=${DASH0_ENDPOINT:-ingress.eu-west-1.aws.dash0.com:4317}
-      - DASH0_AUTH_TOKEN=${DASH0_AUTH_TOKEN:-}
     volumes:
       - ./vault/init-vault.sh:/scripts/init-vault.sh:ro
       - ./certs/fetch-cert.sh:/scripts/fetch-cert.sh:ro

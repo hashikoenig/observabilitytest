@@ -42,7 +42,7 @@ vault write -format=json pki_int/intermediate/generate/internal \
   | jq -r '.data.csr' > /tmp/pki_int.csr 2>/dev/null || echo "Intermediate CSR already exists"
 
 # Sign Intermediate CA with Root CA
-if [ -f /tmp/pki_int.csr ]; then
+if [ -f /tmp/pki_int.csr ] && [ -s /tmp/pki_int.csr ]; then
   vault write -format=json pki/root/sign-intermediate \
     csr=@/tmp/pki_int.csr \
     format=pem_bundle \
@@ -81,21 +81,38 @@ echo "CA chain exported to /certs/ca.crt"
 echo "Configuring KV secrets engine..."
 vault secrets enable -path=secret kv-v2 2>/dev/null || echo "KV secrets engine already enabled"
 
-# Store Dash0 credentials if provided via environment
-if [ -n "${DASH0_AUTH_TOKEN}" ]; then
-  echo "Storing Dash0 credentials in Vault..."
-  vault kv put secret/dash0 \
-    endpoint="${DASH0_ENDPOINT:-ingress.eu-west-1.aws.dash0.com:4317}" \
-    auth_token="${DASH0_AUTH_TOKEN}"
-  echo "Dash0 credentials stored in Vault at secret/dash0"
+# Read Dash0 credentials from Vault (if they exist) and write to file for collector
+echo "Checking for Dash0 credentials in Vault..."
+DASH0_SECRET=$(vault kv get -format=json secret/dash0 2>/dev/null || echo "")
 
-  # Also write to file for otel-collector (no shell in that container)
-  echo "Writing Dash0 credentials to /certs/dash0.env..."
-  cat > /certs/dash0.env << EOF
-DASH0_ENDPOINT=${DASH0_ENDPOINT:-ingress.eu-west-1.aws.dash0.com:4317}
+if [ -n "$DASH0_SECRET" ] && [ "$DASH0_SECRET" != "" ]; then
+  DASH0_ENDPOINT=$(echo "$DASH0_SECRET" | jq -r '.data.data.endpoint // empty')
+  DASH0_AUTH_TOKEN=$(echo "$DASH0_SECRET" | jq -r '.data.data.auth_token // empty')
+
+  if [ -n "$DASH0_ENDPOINT" ] && [ -n "$DASH0_AUTH_TOKEN" ]; then
+    echo "Writing Dash0 credentials to /certs/dash0.env..."
+    cat > /certs/dash0.env << EOF
+DASH0_ENDPOINT=${DASH0_ENDPOINT}
 DASH0_AUTH_TOKEN=${DASH0_AUTH_TOKEN}
 EOF
-  echo "Dash0 credentials written to /certs/dash0.env"
+    echo "Dash0 credentials written to /certs/dash0.env"
+  else
+    echo "WARNING: Dash0 credentials incomplete in Vault."
+  fi
+else
+  echo "NOTE: No Dash0 credentials in Vault yet."
+  echo "To add credentials after startup, run:"
+  echo "  docker exec observabilitytest-vault-1 vault kv put secret/dash0 \\"
+  echo "    endpoint=ingress.eu-west-1.aws.dash0.com:4317 \\"
+  echo "    auth_token=your-token-here"
+  echo ""
+  echo "Then restart the collector:"
+  echo "  docker compose restart otel-collector"
 fi
 
-echo "Vault PKI setup complete!"
+echo ""
+echo "=========================================="
+echo "Vault UI: http://localhost:8200"
+echo "Vault Token: root"
+echo "=========================================="
+echo "Vault setup complete!"
