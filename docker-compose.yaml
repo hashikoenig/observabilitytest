@@ -47,6 +47,7 @@ services:
     volumes:
       - ./vault/init-vault.sh:/scripts/init-vault.sh:ro
       - ./certs/fetch-cert.sh:/scripts/fetch-cert.sh:ro
+      - ./secrets:/secrets:ro
       - certs:/certs
     entrypoint: ["/bin/sh", "-c"]
     command:

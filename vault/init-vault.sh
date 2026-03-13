@@ -81,7 +81,22 @@ echo "CA chain exported to /certs/ca.crt"
 echo "Configuring KV secrets engine..."
 vault secrets enable -path=secret kv-v2 2>/dev/null || echo "KV secrets engine already enabled"
 
-# Read Dash0 credentials from Vault (if they exist) and write to file for collector
+# Load Dash0 credentials from secrets file if it exists
+if [ -f /secrets/dash0.env ]; then
+  echo "Loading Dash0 credentials from /secrets/dash0.env..."
+  # Source the file to get variables (skip comments)
+  eval $(grep -v '^#' /secrets/dash0.env | grep '=' | xargs)
+
+  if [ -n "$DASH0_AUTH_TOKEN" ] && [ -n "$DASH0_ENDPOINT" ]; then
+    echo "Storing Dash0 credentials in Vault..."
+    vault kv put secret/dash0 \
+      endpoint="$DASH0_ENDPOINT" \
+      auth_token="$DASH0_AUTH_TOKEN"
+    echo "Dash0 credentials stored in Vault"
+  fi
+fi
+
+# Read Dash0 credentials from Vault and write to file for collector
 echo "Checking for Dash0 credentials in Vault..."
 DASH0_SECRET=$(vault kv get -format=json secret/dash0 2>/dev/null || echo "")
 
@@ -100,14 +115,10 @@ EOF
     echo "WARNING: Dash0 credentials incomplete in Vault."
   fi
 else
-  echo "NOTE: No Dash0 credentials in Vault yet."
-  echo "To add credentials after startup, run:"
-  echo "  docker exec observabilitytest-vault-1 vault kv put secret/dash0 \\"
-  echo "    endpoint=ingress.eu-west-1.aws.dash0.com:4317 \\"
-  echo "    auth_token=your-token-here"
-  echo ""
-  echo "Then restart the collector:"
-  echo "  docker compose restart otel-collector"
+  echo "NOTE: No Dash0 credentials found."
+  echo "Create secrets/dash0.env with:"
+  echo "  DASH0_ENDPOINT=ingress.eu-west-1.aws.dash0.com:4317"
+  echo "  DASH0_AUTH_TOKEN=your-token-here"
 fi
 
 echo ""
