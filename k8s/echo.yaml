@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo
+  namespace: observability-test
+  labels:
+    app: echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo
+  template:
+    metadata:
+      labels:
+        app: echo
+    spec:
+      initContainers:
+        - name: fetch-certs
+          image: hashicorp/vault:1.15
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              apk add --no-cache curl jq
+
+              # Wait for Vault PKI to be ready
+              until vault read pki_int/roles/service-cert > /dev/null 2>&1; do
+                echo "Waiting for Vault PKI..."
+                sleep 2
+              done
+
+              # Fetch CA chain
+              vault read -format=json pki/cert/ca | jq -r '.data.certificate' > /certs/ca.crt
+              vault read -format=json pki_int/cert/ca | jq -r '.data.certificate' >> /certs/ca.crt
+
+              # Fetch service certificate
+              CERT_DATA=$(vault write -format=json pki_int/issue/service-cert \
+                common_name="echo.observability.local" \
+                alt_names="localhost,echo" \
+                ip_sans="127.0.0.1" \
+                ttl=24h)
+
+              echo "${CERT_DATA}" | jq -r '.data.certificate' > /certs/echo.crt
+              echo "${CERT_DATA}" | jq -r '.data.private_key' > /certs/echo.key
+
+              chmod 644 /certs/echo.crt /certs/ca.crt
+              chmod 600 /certs/echo.key
+
+              echo "Certificates fetched successfully"
+          env:
+            - name: VAULT_ADDR
+              value: "http://vault:8200"
+            - name: VAULT_TOKEN
+              value: "root"
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+      containers:
+        - name: echo
+          image: echo:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          env:
+            - name: PORT
+              value: "8082"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "grpc://otel-collector:4317"
+            - name: TLS_CERT_FILE
+              value: "/certs/echo.crt"
+            - name: TLS_KEY_FILE
+              value: "/certs/echo.key"
+            - name: TLS_CA_FILE
+              value: "/certs/ca.crt"
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: certs
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo
+  namespace: observability-test
+spec:
+  selector:
+    app: echo
+  ports:
+    - port: 8082
+      targetPort: 8082
+  type: ClusterIP

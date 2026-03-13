@@ -1,0 +1,136 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector:0.96.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - observability
+
+  vault:
+    image: hashicorp/vault:1.15
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=root
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - certs:/certs
+    networks:
+      - observability
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  vault-init:
+    image: hashicorp/vault:1.15
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      - CERT_DIR=/certs
+    volumes:
+      - ./vault/init-vault.sh:/scripts/init-vault.sh:ro
+      - ./certs/fetch-cert.sh:/scripts/fetch-cert.sh:ro
+      - certs:/certs
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache curl jq bash
+        chmod +x /scripts/init-vault.sh
+        chmod +x /scripts/fetch-cert.sh
+        /scripts/init-vault.sh
+        /scripts/fetch-cert.sh gateway
+        /scripts/fetch-cert.sh greeter
+        /scripts/fetch-cert.sh echo
+    networks:
+      - observability
+
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - GREETER_HOST=greeter:8081
+      - ECHO_HOST=echo:8082
+      - TLS_CERT_FILE=/certs/gateway.crt
+      - TLS_KEY_FILE=/certs/gateway.key
+      - TLS_CA_FILE=/certs/ca.crt
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      greeter:
+        condition: service_started
+      echo:
+        condition: service_started
+    volumes:
+      - certs:/certs:ro
+    networks:
+      - observability
+
+  greeter:
+    build:
+      context: ./services/greeter
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - ECHO_HOST=echo:8082
+      - TLS_CERT_FILE=/certs/greeter.crt
+      - TLS_KEY_FILE=/certs/greeter.key
+      - TLS_CA_FILE=/certs/ca.crt
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    volumes:
+      - certs:/certs:ro
+    networks:
+      - observability
+
+  echo:
+    build:
+      context: ./services/echo
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - OTEL_EXPORTER_OTLP_ENDPOINT=grpc://otel-collector:4317
+      - TLS_CERT_FILE=/certs/echo.crt
+      - TLS_KEY_FILE=/certs/echo.key
+      - TLS_CA_FILE=/certs/ca.crt
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    volumes:
+      - certs:/certs:ro
+    networks:
+      - observability
+
+networks:
+  observability:
+    driver: bridge
+
+volumes:
+  certs:

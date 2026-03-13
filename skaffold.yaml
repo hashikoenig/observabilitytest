@@ -1,0 +1,37 @@
+apiVersion: skaffold/v4beta6
+kind: Config
+metadata:
+  name: observability-test
+
+build:
+  artifacts:
+    - image: gateway
+      context: services/gateway
+      docker:
+        dockerfile: Dockerfile
+    - image: greeter
+      context: services/greeter
+      docker:
+        dockerfile: Dockerfile
+    - image: echo
+      context: services/echo
+      docker:
+        dockerfile: Dockerfile
+
+manifests:
+  rawYaml:
+    - k8s/namespace.yaml
+    - k8s/otel-collector.yaml
+    - k8s/gateway.yaml
+    - k8s/greeter.yaml
+    - k8s/echo.yaml
+
+deploy:
+  kubectl: {}
+
+portForward:
+  - resourceType: service
+    resourceName: gateway
+    namespace: observability-test
+    port: 8080
+    localPort: 8080
