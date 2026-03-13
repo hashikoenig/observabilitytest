@@ -183,9 +183,9 @@
 
         <div class="card">
             <div class="architecture">
-Gateway (Go)     Greeter (Python)     Echo (Node.js)
-   "Hallo"    -->    "Bonjour"     -->    "Hello"
-   :8080             :8081               :8082
+Gateway (Go)     Greeter (Python)     Echo (Node.js)     Hola (Java)
+   "Hallo"    -->    "Bonjour"     -->    "Hello"     -->   "Hola"
+   :8080             :8081               :8082             :8083
             </div>
         </div>
 
@@ -212,6 +212,13 @@ Gateway (Go)     Greeter (Python)     Echo (Node.js)
                             <div class="service-lang">Node.js/Express</div>
                         </div>
                     </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="hola" checked>
+                        <div>
+                            <div class="service-name">Hola</div>
+                            <div class="service-lang">Java/Spring Boot</div>
+                        </div>
+                    </label>
                 </div>
             </div>
             <button id="sendBtn" onclick="sendGreeting()">Send Greeting Chain</button>
@@ -230,6 +237,7 @@ Gateway (Go)     Greeter (Python)     Echo (Node.js)
 
             if (document.getElementById('greeter').checked) chain.push('greeter');
             if (document.getElementById('echo').checked) chain.push('echo');
+            if (document.getElementById('hola').checked) chain.push('hola');
 
             const btn = document.getElementById('sendBtn');
             const results = document.getElementById('results');
