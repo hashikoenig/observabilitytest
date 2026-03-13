@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gateway
+  name: hola
   namespace: observability-test
   labels:
-    app: gateway
+    app: hola
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: gateway
+      app: hola
   template:
     metadata:
       labels:
-        app: gateway
+        app: hola
     spec:
       initContainers:
         - name: fetch-certs
@@ -35,16 +35,16 @@ spec:
 
               # Fetch service certificate
               CERT_DATA=$(vault write -format=json pki_int/issue/service-cert \
-                common_name="gateway.observability.local" \
-                alt_names="localhost,gateway" \
+                common_name="hola.observability.local" \
+                alt_names="localhost,hola" \
                 ip_sans="127.0.0.1" \
                 ttl=24h)
 
-              echo "${CERT_DATA}" | jq -r '.data.certificate' > /certs/gateway.crt
-              echo "${CERT_DATA}" | jq -r '.data.private_key' > /certs/gateway.key
+              echo "${CERT_DATA}" | jq -r '.data.certificate' > /certs/hola.crt
+              echo "${CERT_DATA}" | jq -r '.data.private_key' > /certs/hola.key
 
-              chmod 644 /certs/gateway.crt /certs/ca.crt
-              chmod 600 /certs/gateway.key
+              chmod 644 /certs/hola.crt /certs/ca.crt
+              chmod 600 /certs/hola.key
 
               echo "Certificates fetched successfully"
           env:
@@ -56,26 +56,20 @@ spec:
             - name: certs
               mountPath: /certs
       containers:
-        - name: gateway
-          image: gateway:latest
+        - name: hola
+          image: hola:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - containerPort: 8083
           env:
             - name: PORT
-              value: "8080"
+              value: "8083"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "otel-collector:4317"
-            - name: GREETER_HOST
-              value: "greeter:8081"
-            - name: ECHO_HOST
-              value: "echo:8082"
-            - name: HOLA_HOST
-              value: "hola:8083"
+              value: "http://otel-collector:4317"
             - name: TLS_CERT_FILE
-              value: "/certs/gateway.crt"
+              value: "/certs/hola.crt"
             - name: TLS_KEY_FILE
-              value: "/certs/gateway.key"
+              value: "/certs/hola.key"
             - name: TLS_CA_FILE
               value: "/certs/ca.crt"
           volumeMounts:
@@ -84,24 +78,24 @@ spec:
               readOnly: true
           resources:
             requests:
-              memory: "64Mi"
+              memory: "256Mi"
               cpu: "100m"
             limits:
-              memory: "128Mi"
-              cpu: "200m"
+              memory: "512Mi"
+              cpu: "500m"
           livenessProbe:
             httpGet:
-              path: /health
-              port: 8080
+              path: /actuator/health
+              port: 8083
               scheme: HTTPS
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /health
-              port: 8080
+              path: /actuator/health
+              port: 8083
               scheme: HTTPS
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
       volumes:
         - name: certs
@@ -110,12 +104,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: gateway
+  name: hola
   namespace: observability-test
 spec:
   selector:
-    app: gateway
+    app: hola
   ports:
-    - port: 8080
-      targetPort: 8080
-  type: LoadBalancer
+    - port: 8083
+      targetPort: 8083
+  type: ClusterIP

@@ -56,7 +56,7 @@ fi
 
 # Create role for service certificates
 vault write pki_int/roles/service-cert \
-  allowed_domains="observability.local,localhost,gateway,greeter,echo" \
+  allowed_domains="observability.local,localhost,gateway,greeter,echo,hola" \
   allow_subdomains=true \
   allow_bare_domains=true \
   allow_localhost=true \

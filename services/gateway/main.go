@@ -191,6 +191,12 @@ func getServiceURL(service string) string {
 			host = "echo:8082"
 		}
 		return fmt.Sprintf("%s://%s/greet", scheme, host)
+	case "hola":
+		host := os.Getenv("HOLA_HOST")
+		if host == "" {
+			host = "hola:8083"
+		}
+		return fmt.Sprintf("%s://%s/greet", scheme, host)
 	default:
 		return ""
 	}

@@ -1,0 +1,20 @@
+server:
+  port: ${PORT:8083}
+
+spring:
+  application:
+    name: hola
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+otel:
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4317}

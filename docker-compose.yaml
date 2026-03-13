@@ -52,6 +52,7 @@ services:
         /scripts/fetch-cert.sh gateway
         /scripts/fetch-cert.sh greeter
         /scripts/fetch-cert.sh echo
+        /scripts/fetch-cert.sh hola
     networks:
       - observability
 
@@ -66,6 +67,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - GREETER_HOST=greeter:8081
       - ECHO_HOST=echo:8082
+      - HOLA_HOST=hola:8083
       - TLS_CERT_FILE=/certs/gateway.crt
       - TLS_KEY_FILE=/certs/gateway.key
       - TLS_CA_FILE=/certs/ca.crt
@@ -77,6 +79,8 @@ services:
       greeter:
         condition: service_started
       echo:
+        condition: service_started
+      hola:
         condition: service_started
     volumes:
       - certs:/certs:ro
@@ -117,6 +121,28 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=grpc://otel-collector:4317
       - TLS_CERT_FILE=/certs/echo.crt
       - TLS_KEY_FILE=/certs/echo.key
+      - TLS_CA_FILE=/certs/ca.crt
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    volumes:
+      - certs:/certs:ro
+    networks:
+      - observability
+
+  hola:
+    build:
+      context: ./services/hola
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - PORT=8083
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - TLS_CERT_FILE=/certs/hola.crt
+      - TLS_KEY_FILE=/certs/hola.key
       - TLS_CA_FILE=/certs/ca.crt
     depends_on:
       vault-init:

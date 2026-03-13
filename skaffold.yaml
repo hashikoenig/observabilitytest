@@ -17,6 +17,10 @@ build:
       context: services/echo
       docker:
         dockerfile: Dockerfile
+    - image: hola
+      context: services/hola
+      docker:
+        dockerfile: Dockerfile
 
 manifests:
   rawYaml:
@@ -25,6 +29,8 @@ manifests:
     - k8s/gateway.yaml
     - k8s/greeter.yaml
     - k8s/echo.yaml
+    - k8s/vault.yaml
+    - k8s/hola.yaml
 
 deploy:
   kubectl: {}
