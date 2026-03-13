@@ -4,7 +4,7 @@ const express = require('express');
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
-const { trace, SpanStatusCode } = require('@opentelemetry/api');
+const { trace, SpanStatusCode, context, propagation } = require('@opentelemetry/api');
 
 const app = express();
 const port = process.env.PORT || 8082;
@@ -14,20 +14,26 @@ const tracer = trace.getTracer('echo-service');
 app.use(express.json());
 
 app.get('/greet', (req, res) => {
-  const span = tracer.startSpan('process-greeting');
+  // Extract trace context from incoming request headers
+  const parentContext = propagation.extract(context.active(), req.headers);
 
-  span.setAttribute('greeting.language', 'english');
-  span.setAttribute('greeting.message', 'Hello');
+  // Create child span within the extracted context
+  context.with(parentContext, () => {
+    const span = tracer.startSpan('process-greeting');
 
-  const response = {
-    message: 'Hello',
-    service: 'echo'
-  };
+    span.setAttribute('greeting.language', 'english');
+    span.setAttribute('greeting.message', 'Hello');
 
-  span.setStatus({ code: SpanStatusCode.OK });
-  span.end();
+    const response = {
+      message: 'Hello',
+      service: 'echo'
+    };
 
-  res.json(response);
+    span.setStatus({ code: SpanStatusCode.OK });
+    span.end();
+
+    res.json(response);
+  });
 });
 
 app.get('/health', (req, res) => {

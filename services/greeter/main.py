@@ -4,7 +4,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from opentelemetry import trace
+from opentelemetry import trace, context as otel_context
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -12,7 +12,8 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.semconv.resource import ResourceAttributes
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.propagate import inject
+from opentelemetry.propagate import inject, extract
+from opentelemetry.propagators.textmap import Getter
 
 resource = Resource.create({
     ResourceAttributes.SERVICE_NAME: "greeter",
@@ -61,9 +62,23 @@ def get_service_url(service: str) -> str:
     return None
 
 
+class StarletteGetter(Getter):
+    def get(self, carrier, key):
+        value = carrier.get(key)
+        if value:
+            return [value]
+        return None
+
+    def keys(self, carrier):
+        return list(carrier.keys())
+
+
 @app.get("/greet")
 async def greet(request: Request):
-    with tracer.start_as_current_span("process-greeting") as span:
+    # Extract trace context from incoming request headers
+    ctx = extract(request.headers, getter=StarletteGetter())
+
+    with tracer.start_as_current_span("process-greeting", context=ctx) as span:
         span.set_attribute("greeting.language", "french")
         span.set_attribute("greeting.message", "Bonjour")
 
