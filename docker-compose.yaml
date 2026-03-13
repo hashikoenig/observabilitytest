@@ -1,15 +1,18 @@
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.96.0
+    build:
+      context: ./collector
+      dockerfile: Dockerfile
     command: ["--config=/etc/otel-collector-config.yaml"]
-    environment:
-      - DASH0_ENDPOINT=${DASH0_ENDPOINT:-ingress.eu-west-1.aws.dash0.com:4317}
-      - DASH0_AUTH_TOKEN=${DASH0_AUTH_TOKEN:-}
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - certs:/certs:ro
     ports:
       - "4317:4317"
       - "4318:4318"
+    depends_on:
+      vault:
+        condition: service_healthy
     networks:
       - observability
 
@@ -41,6 +44,8 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
       - CERT_DIR=/certs
+      - DASH0_ENDPOINT=${DASH0_ENDPOINT:-ingress.eu-west-1.aws.dash0.com:4317}
+      - DASH0_AUTH_TOKEN=${DASH0_AUTH_TOKEN:-}
     volumes:
       - ./vault/init-vault.sh:/scripts/init-vault.sh:ro
       - ./certs/fetch-cert.sh:/scripts/fetch-cert.sh:ro

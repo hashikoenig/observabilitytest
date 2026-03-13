@@ -76,4 +76,26 @@ vault read -format=json pki/cert/ca | jq -r '.data.certificate' > /certs/ca.crt
 vault read -format=json pki_int/cert/ca | jq -r '.data.certificate' >> /certs/ca.crt
 
 echo "CA chain exported to /certs/ca.crt"
+
+# Enable KV secrets engine for application secrets
+echo "Configuring KV secrets engine..."
+vault secrets enable -path=secret kv-v2 2>/dev/null || echo "KV secrets engine already enabled"
+
+# Store Dash0 credentials if provided via environment
+if [ -n "${DASH0_AUTH_TOKEN}" ]; then
+  echo "Storing Dash0 credentials in Vault..."
+  vault kv put secret/dash0 \
+    endpoint="${DASH0_ENDPOINT:-ingress.eu-west-1.aws.dash0.com:4317}" \
+    auth_token="${DASH0_AUTH_TOKEN}"
+  echo "Dash0 credentials stored in Vault at secret/dash0"
+
+  # Also write to file for otel-collector (no shell in that container)
+  echo "Writing Dash0 credentials to /certs/dash0.env..."
+  cat > /certs/dash0.env << EOF
+DASH0_ENDPOINT=${DASH0_ENDPOINT:-ingress.eu-west-1.aws.dash0.com:4317}
+DASH0_AUTH_TOKEN=${DASH0_AUTH_TOKEN}
+EOF
+  echo "Dash0 credentials written to /certs/dash0.env"
+fi
+
 echo "Vault PKI setup complete!"
