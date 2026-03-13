@@ -1,7 +1,10 @@
 services:
   otel-collector:
-    image: otel/opentelemetry-collector:0.96.0
+    image: otel/opentelemetry-collector-contrib:0.96.0
     command: ["--config=/etc/otel-collector-config.yaml"]
+    environment:
+      - DASH0_ENDPOINT=${DASH0_ENDPOINT:-ingress.eu-west-1.aws.dash0.com:4317}
+      - DASH0_AUTH_TOKEN=${DASH0_AUTH_TOKEN:-}
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:

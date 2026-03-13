@@ -14,15 +14,16 @@ processors:
 exporters:
   debug:
     verbosity: detailed
-  # Uncomment and configure for your backend:
-  # otlp:
-  #   endpoint: "your-backend:4317"
-  #   tls:
-  #     insecure: true
+
+  # Dash0 OTLP Exporter
+  otlp/dash0:
+    endpoint: ${DASH0_ENDPOINT}
+    headers:
+      Authorization: "Bearer ${DASH0_AUTH_TOKEN}"
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlp/dash0]
