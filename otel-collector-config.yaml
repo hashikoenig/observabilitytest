@@ -6,6 +6,15 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  # Prometheus receiver for cAdvisor metrics
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'cadvisor'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['cadvisor:8080']
+
 processors:
   batch:
     timeout: 1s
@@ -27,3 +36,8 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [debug, otlp/dash0]
+
+    metrics:
+      receivers: [prometheus]
+      processors: [batch]
+      exporters: [otlp/dash0]
