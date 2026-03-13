@@ -3,8 +3,11 @@ const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumenta
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-grpc');
 const { Resource } = require('@opentelemetry/resources');
 const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
+const { W3CTraceContextPropagator } = require('@opentelemetry/core');
 
-const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'grpc://otel-collector:4317';
+// Remove grpc:// prefix - the gRPC exporter just needs host:port
+let otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'otel-collector:4317';
+otlpEndpoint = otlpEndpoint.replace(/^grpc:\/\//, '');
 
 const sdk = new NodeSDK({
   resource: new Resource({
@@ -14,10 +17,14 @@ const sdk = new NodeSDK({
   traceExporter: new OTLPTraceExporter({
     url: otlpEndpoint,
   }),
+  textMapPropagator: new W3CTraceContextPropagator(),
   instrumentations: [
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-fs': {
         enabled: false,
+      },
+      '@opentelemetry/instrumentation-http': {
+        enabled: true,
       },
     }),
   ],

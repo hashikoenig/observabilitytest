@@ -137,7 +137,7 @@ services:
       - "8082:8082"
     environment:
       - PORT=8082
-      - OTEL_EXPORTER_OTLP_ENDPOINT=grpc://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - TLS_CERT_FILE=/certs/echo.crt
       - TLS_KEY_FILE=/certs/echo.key
       - TLS_CA_FILE=/certs/ca.crt
